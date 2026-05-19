@@ -1,0 +1,79 @@
+analyze_song_task:
+  description: >
+    Use the song_lookup tool to find "{song_title}" by "{artist}" in the Spotify dataset.
+
+    From the returned data produce a structured musical profile including:
+    1. Exact values for all audio features (danceability, energy, loudness,
+       speechiness, acousticness, instrumentalness, liveness, valence, tempo)
+    2. The song's dataset genre and popularity score
+    3. A plain-language interpretation of each key feature
+       (e.g. "energy=0.87 → loud, fast, intense track")
+    4. A one-paragraph summary of what makes this song sonically distinctive
+
+    Pass both song_title="{song_title}" and artist="{artist}" to the tool for
+    accurate lookup.
+
+    IMPORTANT: if the tool returns an error ("not found"), you MUST report
+    that error exactly as returned. Do NOT invent or estimate any audio features.
+    Do NOT proceed with fabricated data.
+  expected_output: >
+    A structured musical profile of "{song_title}" by "{artist}" with all numerical
+    audio features, plain-language interpretations, and a summary paragraph.
+    If the song was not found, output only the error message from the tool.
+  agent: song_analyzer
+
+research_similar_songs_task:
+  description: >
+    Using the musical profile of "{song_title}" by "{artist}" from the previous task,
+    call the similar_song_search tool to find the 10 most similar songs.
+
+    Steps:
+    1. Call similar_song_search with song_title="{song_title}" and artist="{artist}"
+       and top_n=10
+    2. Record each result: track_name, artists, genre, popularity, similarity_score
+    3. Present all 10 results sorted by similarity_score descending
+
+    Do not invent songs — use only what the tool returns.
+  expected_output: >
+    A ranked list of exactly 10 songs, each with: track name, artist(s), genre,
+    popularity, and similarity score. Sorted most to least similar.
+  agent: music_researcher
+  context:
+    - analyze_song_task
+
+explain_and_recommend_task:
+  description: >
+    You have the top 10 similar songs for "{song_title}" by "{artist}".
+    Re-rank them using SHAP evidence and produce the final recommendation report.
+
+    Steps:
+    1. For each of the 10 songs call shap_explain_similarity with:
+         input_song="{song_title}", input_artist="{artist}",
+         recommended_song=<track name>, recommended_artist=<artist>
+    2. Compute a SHAP alignment score for each = average avg_abs_shap
+       across aligned features
+    3. Re-rank all 10 by SHAP alignment score (highest = best)
+    4. Select the top 3-5 from the SHAP re-ranking as final recommendations
+    5. For each selected song write:
+         - Track name, artist, genre
+         - Cosine similarity score and SHAP alignment score
+         - Top 2-3 shared features with values in both songs and SHAP contributions
+         - A 2-sentence explanation grounded in the feature evidence
+
+    If the SHAP re-ranking differs from the cosine similarity ranking, note which
+    songs moved up or down and why.
+  expected_output: >
+    A Markdown report titled "## Music Recommendations for {song_title} by {artist}"
+    containing:
+    - A brief intro paragraph about the song's audio identity
+    - A note on whether SHAP ranking differed from cosine similarity ranking
+    - A numbered list of 3-5 final recommendations, each with:
+        * Title, artist, genre
+        * Cosine similarity score + SHAP alignment score
+        * Top shared features with values and SHAP importance
+        * 2-sentence explanation grounded in the feature data
+  agent: explainability_agent
+  context:
+    - research_similar_songs_task
+  output_file: output/recommendations.md
+  markdown: true
