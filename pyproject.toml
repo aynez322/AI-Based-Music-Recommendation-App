@@ -1,0 +1,30 @@
+[project]
+name = "ai-based-music-recommendation"
+version = "0.1.0"
+description = "AI-based music recommendation multi-agent system using CrewAI"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "crewai[tools]>=0.102.0,<2.0.0",
+    "pandas>=2.0.0",
+    "numpy>=1.26.0",
+    "kaggle>=1.7.4.5",
+    "xgboost>=3.2.0",
+    "shap>=0.49.1",
+    "scikit-learn>=1.7.2",
+    "kagglehub>=1.0.1",
+    "requests>=2.31.0",
+]
+
+[project.scripts]
+run_recommendations = "ai_based_music_recommendation.main:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_based_music_recommendation"]
+
+[tool.crewai]
+type = "crew"
