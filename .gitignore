@@ -1,0 +1,27 @@
+# Environment & secrets
+.env
+
+# Dataset files (large binaries — not tracked in git)
+data/
+
+# Generated output
+output/
+
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# IDE & tools
+.vscode/
+.idea/
+.claude/
+
+# Build artifacts
+dist/
+*.egg-info/
