@@ -1,23 +1,20 @@
 analyze_song_task:
   description: >
-    Use the song_lookup tool to find "{song_title}" by "{artist}" in the Spotify dataset.
+    Use the song_lookup tool to find "{song_title}" by "{artist}" in the dataset.
+    Pass both song_title="{song_title}" and artist="{artist}" to the tool.
 
     From the returned data produce a structured musical profile including:
-    1. Exact values for all audio features (danceability, energy, loudness,
+    1. Exact values for all 9 audio features (danceability, energy, loudness,
        speechiness, acousticness, instrumentalness, liveness, valence, tempo)
     2. The song's dataset genre and popularity score
     3. A plain-language interpretation of each key feature
        (e.g. "energy=0.87 → loud, fast, intense track")
     4. A one-paragraph summary of what makes this song sonically distinctive
 
-    Pass both song_title="{song_title}" and artist="{artist}" to the tool for
-    accurate lookup.
-
-    IMPORTANT: if the tool returns an error ("not found"), you MUST report
-    that error exactly as returned. Do NOT invent or estimate any audio features.
-    Do NOT proceed with fabricated data.
+    IMPORTANT: if the tool returns an error, report it exactly as returned.
+    Do NOT invent or estimate any audio features.
   expected_output: >
-    A structured musical profile of "{song_title}" by "{artist}" with all numerical
+    A structured musical profile of "{song_title}" by "{artist}" with all 9 numerical
     audio features, plain-language interpretations, and a summary paragraph.
     If the song was not found, output only the error message from the tool.
   agent: song_analyzer
@@ -25,53 +22,64 @@ analyze_song_task:
 research_similar_songs_task:
   description: >
     Using the musical profile of "{song_title}" by "{artist}" from the previous task,
-    call the similar_song_search tool to find the 10 most similar songs.
+    perform two steps:
 
-    Steps:
-    1. Call similar_song_search with song_title="{song_title}" and artist="{artist}"
-       and top_n=10
-    2. Record each result: track_name, artists, genre, popularity, similarity_score
-    3. Present all 10 results sorted by similarity_score descending
+    STEP 1 — Genre Fingerprinting:
+    Call genre_fingerprinter with song_title="{song_title}" and artist="{artist}".
+    Record: top 3 genre matches with similarity scores, key signals for the top match,
+    and the feature-vs-fingerprint comparison showing which features align most strongly.
 
-    Do not invent songs — use only what the tool returns.
+    STEP 2 — Similar Song Search:
+    Call similar_song_search with song_title="{song_title}" and artist="{artist}"
+    and top_n=5.
+    Record each result: track_name, artists, genre, popularity, similarity_score.
+    Present all 5 results sorted by similarity_score descending.
+
+    Do not invent songs or genres — use only what the tools return.
   expected_output: >
-    A ranked list of exactly 10 songs, each with: track name, artist(s), genre,
-    popularity, and similarity score. Sorted most to least similar.
+    A two-part report:
+    Part 1 — Genre fingerprint analysis: predicted genre (top match), similarity score,
+    key signals, and how the song's feature profile compares to the fingerprint.
+    Part 2 — A ranked list of 5 similar songs, each with: track name, artist(s),
+    genre, popularity, and similarity score. Sorted most to least similar.
   agent: music_researcher
   context:
     - analyze_song_task
 
 explain_and_recommend_task:
   description: >
-    You have the top 10 similar songs for "{song_title}" by "{artist}".
-    Re-rank them using SHAP evidence and produce the final recommendation report.
+    You have the genre fingerprint analysis and 5 similar songs for "{song_title}"
+    by "{artist}". Produce the final recommendation report with SHAP and fingerprint
+    explanations.
 
     Steps:
-    1. For each of the 10 songs call shap_explain_similarity with:
+    1. For each of the 5 songs call shap_explain_similarity with:
          input_song="{song_title}", input_artist="{artist}",
-         recommended_song=<track name>, recommended_artist=<artist>
-    2. Compute a SHAP alignment score for each = average avg_abs_shap
-       across aligned features
-    3. Re-rank all 10 by SHAP alignment score (highest = best)
-    4. Select the top 3-5 from the SHAP re-ranking as final recommendations
-    5. For each selected song write:
+         recommended_song=<track_name>, recommended_artist=<artists>
+    2. For each song record:
+         - SHAP alignment score = average avg_abs_shap across aligned features
+         - fingerprint_cosine_similarity (already in tool output)
+         - input_fingerprint_key_signals and recommended_fingerprint_key_signals
+    3. Rank all 5 by SHAP alignment score (highest = most strongly explained)
+    4. For each song write:
          - Track name, artist, genre
-         - Cosine similarity score and SHAP alignment score
+         - Cosine similarity score + SHAP alignment score + fingerprint cosine score
          - Top 2-3 shared features with values in both songs and SHAP contributions
-         - A 2-sentence explanation grounded in the feature evidence
-
-    If the SHAP re-ranking differs from the cosine similarity ranking, note which
-    songs moved up or down and why.
+         - The relevant fingerprint key signals for the predicted genre
+         - A 2-3 sentence explanation grounded in SHAP evidence AND fingerprint signals
+    5. Note if the SHAP ranking differs from the original cosine similarity ranking.
   expected_output: >
     A Markdown report titled "## Music Recommendations for {song_title} by {artist}"
     containing:
-    - A brief intro paragraph about the song's audio identity
-    - A note on whether SHAP ranking differed from cosine similarity ranking
-    - A numbered list of 3-5 final recommendations, each with:
+    - A brief intro paragraph: the song's audio identity + its fingerprint-predicted genre
+    - Genre fingerprint summary: what genre was predicted and why (key signals)
+    - A numbered list of all 5 recommendations ranked by SHAP alignment, each with:
         * Title, artist, genre
-        * Cosine similarity score + SHAP alignment score
+        * Cosine similarity score + SHAP alignment score + fingerprint cosine score
         * Top shared features with values and SHAP importance
-        * 2-sentence explanation grounded in the feature data
+        * Fingerprint key signals for the shared genre
+        * 2-3 sentence explanation grounded in feature data and fingerprint signals
+    - A closing note on whether SHAP ranking differed from cosine ranking
   agent: explainability_agent
   context:
     - research_similar_songs_task
