@@ -2,7 +2,7 @@
 .env
 
 # Dataset files (large binaries — not tracked in git)
-data/
+#data/
 
 # Generated output
 output/
