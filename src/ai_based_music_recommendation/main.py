@@ -195,8 +195,54 @@ def _clean_console():
         sys.stdout = original
 
 
+# redare de rezerva cand agentul produce json brut in loc de proza
+def _render_shap_json(data) -> str:
+    items = data if isinstance(data, list) else [data]
+    lines = ["## Music Recommendations\n"]
+    for i, r in enumerate(items, 1):
+        rec    = r.get("recommended_song", "?")
+        artist = r.get("recommended_artist", "")
+        genre  = r.get("recommended_predicted_genre", "?")
+        sim    = float(r.get("fingerprint_cosine_similarity", 0))
+        shared = r.get("top_shared_features", [])
+        sig    = r.get("recommended_fingerprint_key_signals", "")
+
+        heading = f"### {i}. {rec}" + (f" — {artist}" if artist else "")
+        lines.append(heading)
+        lines.append(f"Genre: **{genre}** | Similarity: **{sim:.2f}**")
+
+        if shared:
+            top = [f for f in shared if f.get("aligned")][:3] or shared[:3]
+            feat_parts = []
+            for f in top:
+                iv = f.get("input_value")
+                rv = f.get("recommended_value")
+                iv_s = f"{iv:.2f}" if iv is not None else "?"
+                rv_s = f"{rv:.2f}" if rv is not None else "?"
+                feat_parts.append(f"{f['feature']} ({iv_s} vs {rv_s})")
+            feat_str = ", ".join(feat_parts)
+            para = f"This recommendation is driven by shared {genre} characteristics. "
+            para += f"The top aligned audio features are {feat_str}, "
+            para += f"giving a cosine similarity of {sim:.2f}."
+            if sig:
+                para += f" Genre fingerprint signals: {sig}."
+            lines.append(para)
+        lines.append("")
+    return "\n".join(lines)
+
+
 # converteste markdown-ul din raportul final in text colorat pentru terminal
 def _format_output(text: str) -> str:
+    text = text.strip()
+    # fallback: daca agentul a emis json brut, il randam ca text lizibil
+    if text.startswith(("{", "[")):
+        try:
+            data = json.loads(text)
+            if isinstance(data, (dict, list)):
+                text = _render_shap_json(data)
+        except Exception:
+            pass
+
     out: list[str] = []
     for line in text.splitlines():
         m2 = re.match(r"^## (.+)$", line)

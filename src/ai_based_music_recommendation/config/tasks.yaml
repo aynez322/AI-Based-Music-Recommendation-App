@@ -48,38 +48,37 @@ research_similar_songs_task:
 
 explain_and_recommend_task:
   description: >
-    You have the genre fingerprint analysis and 5 similar songs for "{song_title}"
-    by "{artist}". Produce the final recommendation report with SHAP and fingerprint
-    explanations.
+    You have 5 similar songs for "{song_title}" by "{artist}". Call
+    shap_explain_similarity once for each of the 5 songs:
+      input_song="{song_title}", input_artist="{artist}",
+      recommended_song=<track_name>, recommended_artist=<artists>
 
-    Steps:
-    1. For each of the 5 songs call shap_explain_similarity with:
-         input_song="{song_title}", input_artist="{artist}",
-         recommended_song=<track_name>, recommended_artist=<artists>
-    2. For each song record:
-         - SHAP alignment score = average avg_abs_shap across aligned features
-         - fingerprint_cosine_similarity (already in tool output)
-         - input_fingerprint_key_signals and recommended_fingerprint_key_signals
-    3. Rank all 5 by SHAP alignment score (highest = most strongly explained)
-    4. For each song write:
-         - Track name, artist, genre
-         - Cosine similarity score + SHAP alignment score + fingerprint cosine score
-         - Top 2-3 shared features with values in both songs and SHAP contributions
-         - The relevant fingerprint key signals for the predicted genre
-         - A 2-3 sentence explanation grounded in SHAP evidence AND fingerprint signals
-    5. Note if the SHAP ranking differs from the original cosine similarity ranking.
+    After all 5 calls are done, write a Markdown report in plain English.
+
+    IMPORTANT: Do NOT copy or output any JSON or raw tool data. Write only
+    human-readable text. Every claim must come from the tool output values.
+
+    Report format:
+    ## Music Recommendations for {song_title} by {artist}
+
+    One intro sentence about the input song's genre and sound.
+
+    ### 1. Track Name — Artist
+    Genre: <genre> | Similarity: <fingerprint_cosine_similarity>
+    <One paragraph: why this song is similar. Mention the top 2 shared audio
+    features (name the feature and both values), the cosine similarity score,
+    and the shared genre. Example: "Both songs share a strong pop identity with
+    high danceability (0.82 vs 0.79) and upbeat valence (0.71 vs 0.68),
+    reflected in a cosine similarity of 0.91.">
+
+    Repeat ### block for songs 2 through 5.
+
   expected_output: >
     A Markdown report titled "## Music Recommendations for {song_title} by {artist}"
-    containing:
-    - A brief intro paragraph: the song's audio identity + its fingerprint-predicted genre
-    - Genre fingerprint summary: what genre was predicted and why (key signals)
-    - A numbered list of all 5 recommendations ranked by SHAP alignment, each with:
-        * Title, artist, genre
-        * Cosine similarity score + SHAP alignment score + fingerprint cosine score
-        * Top shared features with values and SHAP importance
-        * Fingerprint key signals for the shared genre
-        * 2-3 sentence explanation grounded in feature data and fingerprint signals
-    - A closing note on whether SHAP ranking differed from cosine ranking
+    with 5 numbered song entries. Each entry has a ### heading with track name and
+    artist, a genre/similarity line, and one plain-English paragraph explaining why
+    the song was recommended based on shared audio features and cosine similarity.
+    No JSON, no raw numbers dumps — only readable explanations.
   agent: explainability_agent
   context:
     - research_similar_songs_task
