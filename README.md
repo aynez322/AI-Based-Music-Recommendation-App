@@ -288,7 +288,6 @@ Aceste trăsături se pot obține din fișierele audio cu librării precum `libr
 
 **Alte direcții posibile**
 - **Embeddings + indexare vectorială (ANN).** În loc de cosinus liniar peste tot dataset-ul la fiecare cerere, se pot precalcula embeddings și folosi un index aproximativ (FAISS, Annoy, hnswlib) — căutare aproape instantanee și scalabilă la milioane de piese.
-- **Reutilizarea rezultatelor între task-uri.** Etapa 2 și etapa 3 calculează ambele lista de piese similare; transmiterea rezultatului din task 2 către task 3 ar elimina munca dublă.
 - **Recomandare hibridă / colaborativă.** Combinarea similarității pe conținut cu semnale comportamentale (istoricul de ascultare, „cine a ascultat X a ascultat și Y") ar adăuga relevanță dincolo de simpla asemănare sonoră.
 - **Personalizare și feedback.** Memorarea preferințelor utilizatorului și reordonarea recomandărilor pe baza feedback-ului (like/skip).
 - **LLM mai capabil pentru explicații.** Trecerea la un model mai puternic (vezi mai jos) ar permite eliminarea liniilor rigide „copy exactly" și explicații mai naturale, fără constrângeri de format.
