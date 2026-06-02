@@ -369,3 +369,128 @@ class SHAPExplainerTool(BaseTool):
             },
             indent=2,
         )
+
+
+# tool care returneaza dovezile SHAP + XGBoost pentru toate cele 5 cantece, intr-un singur apel
+class SHAPAnalysisInput(BaseModel):
+    song_title: str = Field(..., description="Title of the input song")
+    artist: str = Field(default="", description="Artist of the input song (optional)")
+
+
+class SHAPAnalysisTool(BaseTool):
+    name: str = "shap_analyze_recommendations"
+    description: str = (
+        "Runs the trained XGBoost genre classifier and SHAP on the input song and its "
+        "5 most similar songs, all in ONE call. Returns the evidence you need to explain "
+        "each recommendation: the XGBoost-predicted genre, the audio-feature cosine "
+        "similarity, and the SHAP-ranked shared audio features (with their values and SHAP "
+        "impact) for each recommended song. Call this ONCE with the input song_title and "
+        "artist, then write your explanations from the returned evidence."
+    )
+    args_schema: Type[BaseModel] = SHAPAnalysisInput
+
+    def _run(self, song_title: str, artist: str = "") -> str:
+        try:
+            df, _ = _load()
+            model, le, explainer = _get_model_and_explainer()
+        except Exception as exc:
+            return f"Error loading data: {exc}"
+
+        in_idx = _find_index(df, song_title, artist)
+        if in_idx is None:
+            return f"Error: '{song_title}' not found in dataset."
+
+        # gaseste cele 5 cantece similare
+        from ai_based_music_recommendation.tools.dataset_tools import SimilarSongSearchTool
+
+        similar_raw = SimilarSongSearchTool()._run(
+            song_title=song_title, artist=artist, top_n=5
+        )
+        try:
+            similar = json.loads(similar_raw)
+        except Exception:
+            return f"Error finding similar songs: {similar_raw}"
+        if not similar:
+            return "No similar songs found."
+
+        def _vec(idx):
+            v = np.array(
+                [float(df.loc[idx, f]) if f in df.columns else np.nan for f in CLASSIFIER_FEATURES],
+                dtype=float,
+            ).reshape(1, -1)
+            return np.where(v == -1, np.nan, v)
+
+        in_X = _vec(in_idx)
+        in_genre, in_cls = _resolve_genre(df, in_idx, model, le, in_X)
+        in_shap = _shap_for_class(explainer, in_X, in_cls)
+        in_fp = _to_fingerprint_scale(df.loc[in_idx])
+        in_fp_norm = np.linalg.norm(in_fp) or 1.0
+
+        in_name = str(df.loc[in_idx, "track_name"])
+        in_artist = str(df.loc[in_idx, "artists"]) if "artists" in df.columns else artist
+        in_label = f'"{in_name}"'
+        if in_artist and in_artist.lower() not in ("nan", ""):
+            in_label += f" by {in_artist}"
+
+        lines = [
+            f"SHAP + XGBoost similarity analysis for the input song {in_label}.",
+            f"XGBoost predicted genre of the input song: {in_genre}.",
+            "",
+            "For each SONG block below, copy the HEADING line and the GENRE LINE exactly "
+            "as written, then write one paragraph using the EVIDENCE.",
+            "",
+        ]
+
+        for rank, song in enumerate(similar, 1):
+            rec_track = str(song.get("track_name", ""))
+            rec_artist = song.get("artists", "")
+            if not isinstance(rec_artist, str) or rec_artist.lower() in ("nan", ""):
+                rec_artist = ""
+
+            rec_label = f'"{rec_track}"'
+            if rec_artist:
+                rec_label += f" by {rec_artist}"
+
+            rec_idx = _find_index(df, rec_track, rec_artist)
+            if rec_idx is None:
+                continue
+
+            rec_X = _vec(rec_idx)
+            rec_genre, rec_cls = _resolve_genre(df, rec_idx, model, le, rec_X)
+            rec_shap = _shap_for_class(explainer, rec_X, rec_cls)
+
+            feats = []
+            for i, feat in enumerate(CLASSIFIER_FEATURES):
+                sv_in, sv_rec = float(in_shap[i]), float(rec_shap[i])
+                aligned = (sv_in >= 0) == (sv_rec >= 0)
+                iv = round(float(df.loc[in_idx, feat]), 2) if feat in df.columns else None
+                rv = round(float(df.loc[rec_idx, feat]), 2) if feat in df.columns else None
+                feats.append({
+                    "feature": feat, "iv": iv, "rv": rv, "aligned": aligned,
+                    "shap": round((abs(sv_in) + abs(sv_rec)) / 2, 3),
+                })
+            feats.sort(key=lambda x: x["shap"], reverse=True)
+            top = [f for f in feats if f["aligned"] and f["iv"] is not None][:3]
+            top = top or [f for f in feats if f["iv"] is not None][:3]
+
+            rec_fp = _to_fingerprint_scale(df.loc[rec_idx])
+            rec_fp_norm = np.linalg.norm(rec_fp) or 1.0
+            cos = round(float(np.dot(in_fp, rec_fp) / (in_fp_norm * rec_fp_norm)), 2)
+
+            genre_note = "same genre as input" if in_genre == rec_genre else "different genre from input"
+
+            lines.append(f"SONG {rank}")
+            lines.append(f"  HEADING (copy exactly): ### {rank}. {rec_label}")
+            lines.append(f"  GENRE LINE (copy exactly): Genre: {rec_genre} | Similarity: {cos:.2f}")
+            lines.append("  EVIDENCE for your paragraph:")
+            lines.append(f"    - XGBoost predicted genre: {rec_genre} ({genre_note})")
+            lines.append(f"    - audio-feature cosine similarity: {cos:.2f}")
+            lines.append("    - top shared audio features by SHAP importance:")
+            for f in top:
+                lines.append(
+                    f"        * {f['feature']}: input {f['iv']} vs recommended {f['rv']} "
+                    f"(SHAP impact {f['shap']})"
+                )
+            lines.append("")
+
+        return "\n".join(lines)

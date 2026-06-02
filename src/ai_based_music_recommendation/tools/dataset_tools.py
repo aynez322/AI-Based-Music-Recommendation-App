@@ -338,6 +338,11 @@ class SimilarSongSearchTool(BaseTool):
         df_work["_similarity"] = similarities
         df_work = df_work[df_work.index != ref_idx]
 
+        # exclude alte intrari ale aceluiasi cantec (covere/karaoke au acelasi titlu si similaritate ~1.0)
+        ref_name_lower = str(df.loc[ref_idx, "track_name"]).strip().lower()
+        same_title = df_work["track_name"].str.strip().str.lower() == ref_name_lower
+        df_work = df_work[~same_title]
+
         min_candidates = top_n * 5
 
         if "track_genre" in df_work.columns:

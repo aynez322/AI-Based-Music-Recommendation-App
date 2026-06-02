@@ -5,9 +5,8 @@ from typing import List
 
 from ai_based_music_recommendation.tools import (
     SongLookupTool,
-    GenreFingerprinterTool,
     SimilarSongSearchTool,
-    SHAPExplainerTool,
+    SHAPAnalysisTool,
 )
 
 
@@ -29,12 +28,12 @@ class MusicRecommendationCrew:
             verbose=True,
         )
 
-    # agentul care cauta cantece similare folosind amprente de gen si similaritate cosinus
+    # agentul care cauta cantece similare folosind similaritate cosinus pe caracteristici audio
     @agent
     def music_researcher(self) -> Agent:
         return Agent(
             config=self.agents_config["music_researcher"],
-            tools=[GenreFingerprinterTool(), SimilarSongSearchTool()],
+            tools=[SimilarSongSearchTool()],
             verbose=True,
         )
 
@@ -43,7 +42,7 @@ class MusicRecommendationCrew:
     def explainability_agent(self) -> Agent:
         return Agent(
             config=self.agents_config["explainability_agent"],
-            tools=[SHAPExplainerTool()],
+            tools=[SHAPAnalysisTool()],
             verbose=True,
         )
 

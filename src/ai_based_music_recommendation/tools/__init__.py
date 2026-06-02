@@ -4,11 +4,15 @@ from ai_based_music_recommendation.tools.dataset_tools import (
     GenreFingerprinterTool,
     SimilarSongSearchTool,
 )
-from ai_based_music_recommendation.tools.explainability_tools import SHAPExplainerTool
+from ai_based_music_recommendation.tools.explainability_tools import (
+    SHAPExplainerTool,
+    SHAPAnalysisTool,
+)
 
 __all__ = [
     "SongLookupTool",
     "GenreFingerprinterTool",
     "SimilarSongSearchTool",
     "SHAPExplainerTool",
+    "SHAPAnalysisTool",
 ]

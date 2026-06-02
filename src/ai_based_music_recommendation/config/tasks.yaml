@@ -22,25 +22,16 @@ analyze_song_task:
 research_similar_songs_task:
   description: >
     Using the musical profile of "{song_title}" by "{artist}" from the previous task,
-    perform two steps:
+    find the most similar songs.
 
-    STEP 1 — Genre Fingerprinting:
-    Call genre_fingerprinter with song_title="{song_title}" and artist="{artist}".
-    Record: top 3 genre matches with similarity scores, key signals for the top match,
-    and the feature-vs-fingerprint comparison showing which features align most strongly.
-
-    STEP 2 — Similar Song Search:
     Call similar_song_search with song_title="{song_title}" and artist="{artist}"
     and top_n=5.
     Record each result: track_name, artists, genre, popularity, similarity_score.
     Present all 5 results sorted by similarity_score descending.
 
-    Do not invent songs or genres — use only what the tools return.
+    Do not invent songs or genres — use only what the tool returns.
   expected_output: >
-    A two-part report:
-    Part 1 — Genre fingerprint analysis: predicted genre (top match), similarity score,
-    key signals, and how the song's feature profile compares to the fingerprint.
-    Part 2 — A ranked list of 5 similar songs, each with: track name, artist(s),
+    A ranked list of 5 similar songs, each with: track name, artist(s),
     genre, popularity, and similarity score. Sorted most to least similar.
   agent: music_researcher
   context:
@@ -48,37 +39,42 @@ research_similar_songs_task:
 
 explain_and_recommend_task:
   description: >
-    You have 5 similar songs for "{song_title}" by "{artist}". Call
-    shap_explain_similarity once for each of the 5 songs:
-      input_song="{song_title}", input_artist="{artist}",
-      recommended_song=<track_name>, recommended_artist=<artists>
+    Call the shap_analyze_recommendations tool exactly once with
+    song_title="{song_title}" and artist="{artist}". The tool returns the SHAP +
+    XGBoost evidence for the 5 recommended songs: for each song, its XGBoost-predicted
+    genre, the audio-feature cosine similarity, and the top shared audio features
+    (with values and SHAP impact).
 
-    After all 5 calls are done, write a Markdown report in plain English.
+    Using ONLY that evidence, write a Markdown report. Do NOT call any other tool.
+    Do NOT output JSON or raw tool data — write human-readable English.
 
-    IMPORTANT: Do NOT copy or output any JSON or raw tool data. Write only
-    human-readable text. Every claim must come from the tool output values.
-
-    Report format:
+    Start the report with this line:
     ## Music Recommendations for {song_title} by {artist}
 
-    One intro sentence about the input song's genre and sound.
+    Then add one intro sentence about the input song's predicted genre and sound.
 
-    ### 1. Track Name — Artist
-    Genre: <genre> | Similarity: <fingerprint_cosine_similarity>
-    <One paragraph: why this song is similar. Mention the top 2 shared audio
-    features (name the feature and both values), the cosine similarity score,
-    and the shared genre. Example: "Both songs share a strong pop identity with
-    high danceability (0.82 vs 0.79) and upbeat valence (0.71 vs 0.68),
-    reflected in a cosine similarity of 0.91.">
+    Then, for EACH "SONG" block returned by the tool, output exactly three things in order:
+    1. The block's HEADING line, copied EXACTLY (it already looks like "### 1. ...").
+    2. The block's GENRE LINE, copied EXACTLY (it already looks like "Genre: ... | Similarity: ...").
+    3. One short paragraph explaining why this song was recommended, using the EVIDENCE:
+       name the XGBoost-predicted genre, the top 2 shared audio features with both
+       values, and the cosine similarity.
 
-    Repeat ### block for songs 2 through 5.
+    Do NOT invent song names, artists, genres, or numbers — copy the HEADING and GENRE
+    LINE straight from the tool output, and take every number from the EVIDENCE. Never
+    leave placeholders like "track name" or "Artist" in your answer.
 
+    Example of one finished entry:
+    ### 1. "Save Your Tears" by The Weeknd
+    Genre: r&b | Similarity: 0.97
+    Both tracks are classified as r&b by the XGBoost model and share high energy
+    (0.73 vs 0.71) and upbeat valence (0.62 vs 0.65), giving a cosine similarity of 0.97.
   expected_output: >
     A Markdown report titled "## Music Recommendations for {song_title} by {artist}"
     with 5 numbered song entries. Each entry has a ### heading with track name and
-    artist, a genre/similarity line, and one plain-English paragraph explaining why
-    the song was recommended based on shared audio features and cosine similarity.
-    No JSON, no raw numbers dumps — only readable explanations.
+    artist, a genre/similarity line, and one plain-English paragraph grounded in the
+    XGBoost genre prediction, the SHAP shared features, and the cosine similarity.
+    No JSON, no raw tool data.
   agent: explainability_agent
   context:
     - research_similar_songs_task
